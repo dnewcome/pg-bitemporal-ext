@@ -1,0 +1,6 @@
+# pg_bitemporal extension
+comment = 'Bitemporal table support with Allen interval algebra operators'
+default_version = '0.1'
+module_pathname = '$libdir/pg_bitemporal'
+relocatable = true
+requires = 'btree_gist'

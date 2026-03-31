@@ -1,0 +1,111 @@
+CREATE EXTENSION pg_bitemporal;
+-- precedes
+t
+f
+f
+-- meets
+t
+f
+f
+-- overlaps
+t
+f
+f
+-- finished-by
+t
+f
+f
+-- contains
+t
+f
+f
+-- starts
+t
+f
+f
+-- equals
+t
+f
+-- started-by
+t
+f
+-- during
+t
+f
+f
+-- finishes
+t
+f
+-- overlapped-by
+t
+f
+-- met-by
+t
+f
+-- preceded-by
+t
+f
+-- allen_relation names
+precedes
+meets
+overlaps
+finished-by
+contains
+starts
+equals
+started-by
+during
+finishes
+overlapped-by
+met-by
+preceded-by
+-- allen_relation_code
+p
+m
+e
+d
+Di
+-- exhaustiveness (all true_count should be 1)
+precedes|1
+meets|1
+overlaps|1
+finished-by|1
+contains|1
+starts|1
+equals|1
+started-by|1
+during|1
+finishes|1
+overlapped-by|1
+met-by|1
+preceded-by|1
+-- infinite bounds
+t
+t
+t
+t
+f
+-- int4range
+t
+t
+t
+during
+t
+-- cross-check && vs allen_any_overlap
+t
+t
+t
+t
+t
+t
+t
+t
+t
+t
+t
+t
+t
+-- empty ranges
+f
+f
+t
