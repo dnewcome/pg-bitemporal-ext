@@ -63,6 +63,149 @@ SELECT id, name, dept, sys_start, sys_end FROM employee ORDER BY sys_start;
 SELECT id, name, dept FROM employee WHERE sys_end = 'infinity';
 ```
 
+## Tutorial
+
+This walkthrough shows both temporal dimensions in action using an employee records scenario.
+
+### System time only
+
+System time tracks the history of what the database knew and when. Enable it with `system_only` mode — you get full audit history with one extra column.
+
+```sql
+CREATE EXTENSION pg_bitemporal;
+
+CREATE TABLE employee (
+    id   int  NOT NULL,
+    name text NOT NULL,
+    dept text
+);
+
+SELECT bitemporal.enable('employee', ARRAY['id'], mode => 'system_only');
+```
+
+Insert a row. The trigger stamps `sys_start = now()` and `sys_end = 'infinity'` automatically.
+
+```sql
+INSERT INTO employee (id, name, dept) VALUES (1, 'Alice', 'Engineering');
+
+SELECT id, name, dept, sys_start, sys_end FROM employee;
+--  id | name  |    dept     |          sys_start           | sys_end
+-- ----+-------+-------------+------------------------------+---------
+--   1 | Alice | Engineering | 2024-03-15 10:00:00+00       | infinity
+```
+
+Update Alice's department. The trigger cancels the physical UPDATE, closes the old row by setting its `sys_end`, and inserts a new current row.
+
+```sql
+UPDATE employee SET dept = 'Management' WHERE id = 1 AND sys_end = 'infinity';
+
+SELECT id, name, dept, sys_start, sys_end FROM employee ORDER BY sys_start;
+--  id | name  |    dept     |          sys_start           |           sys_end
+-- ----+-------+-------------+------------------------------+------------------------------
+--   1 | Alice | Engineering | 2024-03-15 10:00:00+00       | 2024-03-15 11:00:00+00
+--   1 | Alice | Management  | 2024-03-15 11:00:00+00       | infinity
+```
+
+The old row is never gone — you can always query what was current at any past moment:
+
+```sql
+-- What did we know about Alice at 10:30?
+SELECT dept FROM employee
+ WHERE id = 1
+   AND sys_range @> '2024-03-15 10:30:00+00'::timestamptz;
+-- → Engineering
+
+-- Current state
+SELECT dept FROM employee WHERE id = 1 AND sys_end = 'infinity';
+-- → Management
+```
+
+Delete Alice. The trigger performs a soft delete: `sys_end` is closed, no row is physically removed.
+
+```sql
+DELETE FROM employee WHERE id = 1 AND sys_end = 'infinity';
+
+-- Nothing current
+SELECT count(*) FROM employee WHERE sys_end = 'infinity';
+-- → 0
+
+-- Full history preserved
+SELECT id, name, dept, sys_start, sys_end FROM employee ORDER BY sys_start;
+--  id | name  |    dept     |       sys_start        |        sys_end
+-- ----+-------+-------------+------------------------+------------------------
+--   1 | Alice | Engineering | 2024-03-15 10:00:00+00 | 2024-03-15 11:00:00+00
+--   1 | Alice | Management  | 2024-03-15 11:00:00+00 | 2024-03-15 12:00:00+00
+```
+
+### Full bitemporality (system time + valid time)
+
+Valid time records when a fact is true in the real world, independently of when the database recorded it. This is where bitemporality earns its keep: you can correct past mistakes without losing the record of what you previously believed.
+
+```sql
+CREATE TABLE salary (
+    emp_id  int     NOT NULL,
+    amount  numeric NOT NULL
+);
+
+SELECT bitemporal.enable('salary', ARRAY['emp_id']);
+-- Adds sys_start, sys_end, sys_range, valid_from, valid_to, valid_range
+```
+
+Record Alice's salary, valid for all of 2024:
+
+```sql
+INSERT INTO salary (emp_id, amount, valid_from, valid_to)
+VALUES (1, 90000, '2024-01-01', '2025-01-01');
+```
+
+In March you discover her salary should have been 95000 since the start of the year. You correct it — this creates a new system-time version while preserving what you previously believed:
+
+```sql
+UPDATE salary SET amount = 95000
+ WHERE emp_id = 1 AND sys_end = 'infinity';
+```
+
+Now the table holds two system-time versions of the same valid period:
+
+```sql
+SELECT amount, sys_start, sys_end, valid_from, valid_to
+  FROM salary ORDER BY sys_start;
+--  amount |       sys_start        |        sys_end         |    valid_from    |     valid_to
+-- --------+------------------------+------------------------+------------------+------------------
+--   90000 | 2024-03-15 10:00:00+00 | 2024-03-15 11:00:00+00 | 2024-01-01 00:00 | 2025-01-01 00:00
+--   95000 | 2024-03-15 11:00:00+00 | infinity               | 2024-01-01 00:00 | 2025-01-01 00:00
+```
+
+This lets you answer both temporal questions independently:
+
+```sql
+-- What do we believe NOW about Alice's salary on 2024-06-01?
+SELECT amount FROM salary
+ WHERE emp_id = 1
+   AND sys_end = 'infinity'
+   AND valid_range @> '2024-06-01'::timestamptz;
+-- → 95000  (the correction)
+
+-- What did we THINK on 2024-03-15 10:30 about her salary on 2024-06-01?
+SELECT amount FROM salary
+ WHERE emp_id = 1
+   AND sys_range @> '2024-03-15 10:30:00+00'::timestamptz
+   AND valid_range @> '2024-06-01'::timestamptz;
+-- → 90000  (what we believed before the correction)
+```
+
+The two questions have different answers. That's the point of bitemporality.
+
+### Re-inserting a key
+
+Inserting a row for a key that already has a current row automatically closes the existing one first — no need to manually delete. This is useful for bulk loads or replacing current state:
+
+```sql
+-- Alice rejoins after leaving
+INSERT INTO employee (id, name, dept) VALUES (1, 'Alice', 'Sales');
+-- Old current row (if any) gets sys_end = now(); new row becomes current
+```
+
 ## Table structure
 
 `bitemporal.enable()` adds these columns if they don't already exist:
