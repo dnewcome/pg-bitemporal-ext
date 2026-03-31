@@ -1,6 +1,7 @@
 -- Allen interval algebra regression tests
 -- Uses tstzrange for concreteness; all functions accept anyrange.
 
+CREATE EXTENSION IF NOT EXISTS btree_gist;
 CREATE EXTENSION pg_bitemporal;
 
 -- Use unaligned, header-free output so expected file is formatting-independent.

@@ -1,11 +1,12 @@
 EXTENSION    = pg_bitemporal
 MODULE_big   = pg_bitemporal
-OBJS         = src/pg_bitemporal.o src/allen_operators.o src/bitemporal_utils.o
+OBJS         = src/pg_bitemporal.o src/allen_operators.o src/bitemporal_utils.o \
+               src/bitemporal_triggers.o
 
 DATA         = sql/pg_bitemporal--0.1.sql
 PGFILEDESC   = "pg_bitemporal - Bitemporal table support with Allen interval algebra"
 
-REGRESS      = allen_operators
+REGRESS      = allen_operators bitemporal_enable
 REGRESS_OPTS = --inputdir=test
 
 PG_CONFIG   ?= pg_config

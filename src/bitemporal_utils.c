@@ -62,21 +62,21 @@ classify_allen_relation(TypeCacheEntry *typcache,
 	if (ls < 0)
 	{
 		/* A starts first */
-		if (ue < 0)  return "overlaps";      /* A:s<B:s, A:e<B:e          */
-		if (ue == 0) return "finished-by";   /* A:s<B:s, A:e=B:e          */
-		             return "contains";      /* A:s<B:s, A:e>B:e          */
+		if (ue < 0)  return "overlaps";      /* A:s<B:s, A:e<B:e */
+		if (ue == 0) return "finished-by";   /* A:s<B:s, A:e=B:e */
+		return "contains";                   /* A:s<B:s, A:e>B:e */
 	}
 	if (ls == 0)
 	{
 		/* Same start */
-		if (ue < 0)  return "starts";        /* A:s=B:s, A:e<B:e          */
-		if (ue == 0) return "equals";        /* A:s=B:s, A:e=B:e          */
-		             return "started-by";    /* A:s=B:s, A:e>B:e          */
+		if (ue < 0)  return "starts";        /* A:s=B:s, A:e<B:e */
+		if (ue == 0) return "equals";        /* A:s=B:s, A:e=B:e */
+		return "started-by";                 /* A:s=B:s, A:e>B:e */
 	}
 	/* ls > 0: B starts first */
-	if (ue > 0)  return "overlapped-by";     /* B:s<A:s, A:e>B:e          */
-	if (ue == 0) return "finishes";          /* B:s<A:s, A:e=B:e          */
-	             return "during";            /* B:s<A:s, A:e<B:e          */
+	if (ue > 0)  return "overlapped-by";     /* B:s<A:s, A:e>B:e */
+	if (ue == 0) return "finishes";          /* B:s<A:s, A:e=B:e */
+	return "during";                         /* B:s<A:s, A:e<B:e */
 }
 
 /*
